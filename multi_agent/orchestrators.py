@@ -180,39 +180,100 @@ class SemanticConvergence(ConvergenceEngine):
     def __init__(self):
         super().__init__()
         self._reasonings: dict[str, list[str]] = defaultdict(list)
+        self._scores: dict[str, list[float]] = defaultdict(list)
+        self._outputs: dict[str, list[str]] = defaultdict(list)
 
     def check_semantic(self, step_id: str, score: float, decision: str,
-                       reasoning: str, attempt: int) -> tuple[bool, str]:
-        """语义收敛检查——score稳定 + reasoning相似。"""
+                       reasoning: str, attempt: int,
+                       output: str = '') -> tuple[bool, str]:
+        """P3: 语义收敛——score稳定 + n-gram语义相似 + 反刷分。"""
         # 基础收敛检查
         should_stop, reason = self.check(step_id, score, decision, attempt)
         if should_stop:
             return True, reason
 
-        # 语义相似度检查
+        # P3: 反刷分检测
+        self._scores[step_id].append(score)
+        self._outputs[step_id].append(output)
+        if _detect_reward_hacking(self._scores[step_id], self._outputs[step_id]):
+            return True, '检测到刷分行为，强制终止迭代'
+
+        # 语义相似度检查（升级为 n-gram）
         self._reasonings[step_id].append(reasoning)
         if len(self._reasonings[step_id]) >= 3:
             recent = self._reasonings[step_id][-3:]
             sim = _reasoning_similarity(recent)
             if sim > 0.8:
-                return True, f'语义收敛 (相似度{sim:.2f}>0.8)'
+                return True, f'语义收敛 (n-gram相似度{sim:.2f}>0.8)'
 
         return False, '继续'
 
 
 def _reasoning_similarity(reasonings: list[str]) -> float:
-    """计算 reasoning 列表的相似度——简单 token overlap。"""
+    """P3: 语义相似度——字符 n-gram 重叠（比 token Jaccard 更鲁棒）。
+
+    使用 3-gram 字符集重叠率，对同义词替换和词序变化不敏感，
+    但对真正语义变化（不同词根）保持区分力。
+    """
     if len(reasonings) < 2:
         return 1.0
+    import math as _m
+
+    def _ngrams(text: str, n: int = 3) -> set:
+        text = text.lower()
+        return {text[i:i + n] for i in range(max(0, len(text) - n + 1))}
+
     similarities = []
     for i in range(len(reasonings) - 1):
-        a = set(reasonings[i].lower().split())
-        b = set(reasonings[i + 1].lower().split())
+        a = _ngrams(reasonings[i])
+        b = _ngrams(reasonings[i + 1])
         if not a or not b:
             similarities.append(0.0)
         else:
+            # Jaccard on 3-grams
             similarities.append(len(a & b) / max(len(a | b), 1))
-    return sum(similarities) / len(similarities) if similarities else 1.0
+
+    avg = sum(similarities) / len(similarities) if similarities else 1.0
+    # 如果方差极低（所有对比几乎相同）→ 奖励刷取嫌疑，降低相似度
+    if len(similarities) >= 2:
+        variance = sum((s - avg) ** 2 for s in similarities) / len(similarities)
+        if variance < 0.005:
+            avg -= 0.15  # 可疑: 太一致可能是模板化输出
+    return max(0.0, min(1.0, avg))
+
+
+def _detect_reward_hacking(scores: list[float], outputs: list[str]) -> bool:
+    """P3: 反刷分检测——检测 Agent 是否通过表面修饰虚增评分。
+
+    信号:
+      1. 得分持续上升但输出长度单调增长（堆砌注释/空行）
+      2. 代码块数量异常增长（重复代码结构）
+      3. 输出开始出现大量重复模式
+    """
+    if len(scores) < 3 or len(outputs) < 3:
+        return False
+
+    # 检测1: 得分上升 + 长度单调增长
+    score_rising = all(scores[i] <= scores[i + 1] for i in range(len(scores) - 1))
+    lengths = [len(o) for o in outputs]
+    length_rising = all(lengths[i] <= lengths[i + 1] for i in range(len(lengths) - 1))
+    if score_rising and length_rising and lengths[-1] > lengths[0] * 2:
+        return True  # 长度翻倍但得分上升 → 可疑
+
+    # 检测2: 代码块数量异常增长
+    code_blocks = [o.count('```') for o in outputs]
+    if len(set(code_blocks[-2:])) == 1 and code_blocks[-1] > code_blocks[0] * 1.5:
+        return True
+
+    # 检测3: 大量重复行（模板化）
+    for o in outputs[-2:]:
+        lines = [l.strip() for l in o.split('\n') if l.strip()]
+        if len(lines) > 10:
+            unique_ratio = len(set(lines)) / len(lines)
+            if unique_ratio < 0.3:
+                return True
+
+    return False
 
 
 # ── Global Replanner ──
