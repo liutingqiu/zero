@@ -462,12 +462,37 @@ async def cors_middleware(request: web.Request, handler):
     return resp
 
 
-def main():
-    logger.info('零 v5 · aiohttp 启动中... http://%s:%s', HTTP_HOST, HTTP_PORT)
-    logger.info('模块: MessageBus + Security + Cognition + Action + Perception')
-    logger.info('Agent: %d 位已注册，流式协作已启用', len(registry.list_all()))
+# 速率限制
+import time as _time
+_rate_limits: dict[str, list[float]] = {}
 
-    app = web.Application(middlewares=[cors_middleware])
+@web.middleware
+async def rate_limit_middleware(request: web.Request, handler):
+    """简单令牌桶: 每 IP 每分钟 60 请求。"""
+    ip = request.remote or '127.0.0.1'
+    now = _time.time()
+    window = 60  # 1 分钟
+    max_req = 60
+
+    if ip not in _rate_limits:
+        _rate_limits[ip] = []
+    # 清理过期记录
+    _rate_limits[ip] = [t for t in _rate_limits[ip] if now - t < window]
+    if len(_rate_limits[ip]) >= max_req:
+        return web.json_response(
+            {'error': '请求过于频繁，请稍后重试', 'retry_after': int(window - (now - _rate_limits[ip][0]))},
+            status=429,
+            headers={**_cors_headers(), 'Retry-After': str(int(window))},
+        )
+    _rate_limits[ip].append(now)
+    return await handler(request)
+
+
+def main():
+    logger.info('零 v5 · 启动中... http://%s:%s', HTTP_HOST, HTTP_PORT)
+    logger.info('Agent: %d 位已注册', len(registry.list_all()))
+
+    app = web.Application(middlewares=[cors_middleware, rate_limit_middleware])
     app.add_routes(routes)
 
     # 静态资源

@@ -1,0 +1,24 @@
+# Zero · Docker Compose 一键部署
+version: "3.9"
+
+services:
+  zero:
+    build: .
+    container_name: zero
+    ports:
+      - "${ZERO_PORT:-5052}:5052"
+    environment:
+      - ZERO_HOST=0.0.0.0
+      - ZERO_PORT=5052
+      - AGNES_API_KEY=${AGNES_API_KEY:-}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_API_URL=${LLM_API_URL:-https://api.deepseek.com/v1/chat/completions}
+      - ZERO_UNLOCK_SECONDS=${ZERO_UNLOCK_SECONDS:-7200}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5052/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

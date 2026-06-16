@@ -19,3 +19,5 @@ sandbox/
 *.bak
 session_state.json
 behavior_fingerprint.json
+.env
+docker-compose.override.yml
