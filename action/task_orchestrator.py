@@ -284,11 +284,14 @@ class TaskOrchestrator:
                 return {'status': 'failed', 'task_id': task.id,
                         'error': err_msg, 'agent': agent['name']}
         except Exception as e:
+            from utils.result import ErrorCode  # noqa: WPS433
             self.registry.record_result(agent['id'], False)
+            error_code = ErrorCode.INTERNAL
             task.error = str(e)
             self.tsm.transition(task.id, 'task.failed')
             return {'status': 'failed', 'task_id': task.id,
-                    'error': str(e), 'agent': agent['name']}
+                    'error': str(e), 'agent': agent['name'],
+                    'error_code': error_code}
     
     def _call_agent(self, agent, task):
         """调用 Agent 执行任务。返回统一的 Result 信封。

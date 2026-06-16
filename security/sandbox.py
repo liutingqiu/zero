@@ -96,9 +96,20 @@ class Sandbox:
         self.logs.append(line)
     
     def _enforce_path(self, path):
-        if not path: return True
-        if not os.path.abspath(path).startswith(os.path.abspath(self.test_dir)):
-            self._log(f'路径越界: {path}', 'security')
+        """路径安全检查——防符号链接绕过。
+
+        先解析符号链接获取真实路径，再检查是否在沙箱目录内。
+        """
+        if not path:
+            return True
+        try:
+            real = os.path.realpath(path)
+            sandbox_real = os.path.realpath(self.test_dir)
+            if not real.startswith(sandbox_real + os.sep) and real != sandbox_real:
+                self._log(f'路径越界: {path} → {real}', 'security')
+                return False
+        except (OSError, ValueError):
+            self._log(f'路径解析失败: {path}', 'security')
             return False
         return True
     
