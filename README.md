@@ -84,15 +84,17 @@ zero/
 
 ---
 
-## 支持的模型
+## 接入模型
 
-| 模型 | 类型 | 费用 |
-|------|------|:--:|
-| Agnes 2.0 Flash | 文本 | 免费 |
-| Agnes Image 2.1 | 生图 | 免费 |
-| DeepSeek V3 | 文本/代码 | 付费 |
-| GPT-4o | 文本 | 付费 |
-| Ollama | 本地 | 免费 |
+支持任意 **OpenAI 兼容接口**——有 API Key 就能接。配置两行即可：
+
+```bash
+AGNES_API_KEY=sk-xxx    # 免费文本+生图 (推荐)
+LLM_API_KEY=sk-xxx      # DeepSeek / GPT / 任何兼容接口
+LLM_API_URL=https://api.deepseek.com/v1/chat/completions
+```
+
+也支持本地模型 (Ollama)，在 `zero_config.json` 里加一行就行。
 
 ---
 
