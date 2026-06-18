@@ -1,7 +1,7 @@
 # ⚡ 零 (Zero) — AI Agent Runtime
 
-> **半成品 / Work in Progress** — 后端架构已完善，前端设计请暂时忽略。
-> Backend architecture is solid. Frontend design is a known work-in-progress — please ignore the visuals for now.
+> **⚠️ 半成品 / Work in Progress** — 仅供学习参考使用。
+> This project is a personal experiment and not production-ready. Use for learning purposes only.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
@@ -112,6 +112,21 @@ zero/
 | `GET /api/download/{file}` | 文件下载 |
 
 完整文档 → [API_DOCS.md](API_DOCS.md)
+
+---
+
+## 代码审查与修复 / Code Review & Fixes
+
+本项目通过 [Reasonix](https://github.com/liutingqiu/Reasonix)（AI 编码助手）进行了两轮全量代码审查与修复：
+
+| 轮次 | 平台 | 修复数 | 内容 |
+|:--:|------|:--:|------|
+| 1 | Reasonix (DeepSeek V4 Pro) | **15 bugs** | CORS 白名单、错误格式统一、Synthesizer 双重 prompt、预算降级、DOMPurify 回退等 |
+| 2 | Reasonix (DeepSeek V4 Pro) | **25+ bugs** | 致命导入错误、死循环 worker、沙箱跨平台崩溃、重复路由、TTL 缓存泄露、流式连接泄漏等 |
+
+共修复 **40+ 个 Bug**，涵盖致命(4) / 高危(5) / 中等(20) / 低危(15+)。
+
+> 💡 零本身就是 Agent 系统的实验项目，而 Reasonix 是另一个 AI Agent 平台。用 Agent 审查 Agent 的代码 — 自己吃自己的狗粮。
 
 ---
 
